@@ -208,7 +208,10 @@ class McdocLexer:
     
     def read_identifier(self) -> str:
         value = ""
-        while (self.peek().isalnum() or self.peek() in '_'):
+        if self.peek() == '%':
+            value += self.advance()
+
+        while self.peek().isalnum() or self.peek() in '_':
             value += self.advance()
         return value
     
@@ -267,8 +270,8 @@ class McdocLexer:
                 self.tokens.append(Token(token_type, value, start_line, start_column))
                 continue
             
-            # Handle identifiers and keywords
-            if char.isalpha() or char == '_':
+            # Handle identifiers and keywords (including special keys like %key)
+            if char.isalpha() or char == '_' or char == '%':
                 value = self.read_identifier()
                 if value in self.KEYWORDS:
                     token_type = TokenType(value)
@@ -411,6 +414,7 @@ class UnionType(McdocType):
 class ReferenceType(McdocType):
     """Reference to another type"""
     path: str
+    attributes: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -476,135 +480,99 @@ class McdocParser:
         """Parse a type expression"""
         self.skip_newlines()
         
-        # Handle union types in parentheses
-        if self.match(TokenType.LPAREN):
+        # Handle attributes with #[...]
+        attributes = []
+        while self.match(TokenType.HASH):
+            self.advance()  # consume #
+            self.consume(TokenType.LBRACKET)
+            
+            # Parse attribute contents
+            attr_content = []
+            while not self.match(TokenType.RBRACKET, TokenType.EOF):
+                if self.match(TokenType.IDENTIFIER):
+                    id_name = self.advance().value
+                    attr_part = id_name
+                    
+                    if self.match(TokenType.LPAREN):
+                        self.advance()  # consume (
+                        params = []
+                        
+                        while not self.match(TokenType.RPAREN, TokenType.EOF):
+                            if self.match(TokenType.IDENTIFIER):
+                                key = self.advance().value
+                                if self.match(TokenType.EQUALS):
+                                    self.advance()
+                                    if self.match(TokenType.STRING):
+                                        value = self.advance().value
+                                        params.append(f'{key}="{value}"')
+                                else:
+                                    params.append(key)
+                            
+                            if self.match(TokenType.COMMA):
+                                self.advance()
+                                self.skip_newlines()
+                        
+                        self.consume(TokenType.RPAREN)
+                        if params:
+                            attr_part += f"({', '.join(params)})"
+                    
+                    attr_content.append(attr_part)
+                
+                if self.match(TokenType.COMMA):
+                    self.advance()
+                    self.skip_newlines()
+            
+            self.consume(TokenType.RBRACKET)
+            if attr_content:
+                attributes.append(f"#[{', '.join(attr_content)}]")
+
+        # Parse the base type
+        if self.match(TokenType.STRING_KW):
+            base_type = PrimitiveType(self.advance().value)
+        elif self.match(TokenType.LBRACKET):
+            self.advance()  # consume [
+            element_type = self.parse_type()  # This will handle nested attributes
+            self.consume(TokenType.RBRACKET)
+            base_type = ArrayType(element_type)
+        elif self.match(TokenType.LPAREN):
             self.advance()  # consume (
             self.skip_newlines()
             
-            if self.match(TokenType.RPAREN):
-                self.advance()  # consume )
-                return UnionType([])  # Empty union
-            
-            types = [self.parse_type()]
-            
-            while self.match(TokenType.PIPE):
-                self.advance()  # consume |
-                self.skip_newlines()
+            types = []
+            while not self.match(TokenType.RPAREN, TokenType.EOF):
                 types.append(self.parse_type())
+                self.skip_newlines()
+                if self.match(TokenType.PIPE):
+                    self.advance()  # consume |
+                    self.skip_newlines()
+                else:
+                    break
             
             self.consume(TokenType.RPAREN)
-            return UnionType(types) if len(types) > 1 else types[0]
-        
-        # Handle array types
-        if self.match(TokenType.LBRACKET):
-            self.advance()  # consume [
-            self.skip_newlines()
-            
-            # Check for tuple type
-            element_type = self.parse_type()
-            self.skip_newlines()
-            
-            if self.match(TokenType.COMMA):
-                # This is a tuple
-                elements = [element_type]
-                while self.match(TokenType.COMMA):
-                    self.advance()  # consume ,
-                    self.skip_newlines()
-                    if self.match(TokenType.RBRACKET):
-                        break  # Trailing comma
-                    elements.append(self.parse_type())
-                    self.skip_newlines()
-                
-                self.consume(TokenType.RBRACKET)
-                return TupleType(elements)
-            else:
-                # This is an array
-                self.consume(TokenType.RBRACKET)
-                
-                # Check for size constraint
-                size_constraint = None
-                if self.match(TokenType.AT):
-                    self.advance()  # consume @
-                    size_constraint = self.parse_range()
-                
-                return ArrayType(element_type, size_constraint)
-        
-        # Handle primitive array types (byte[], int[], long[])
-        if self.match(TokenType.BYTE, TokenType.INT, TokenType.LONG):
-            base_type = self.advance().value
-            
-            # Check for range constraint
-            range_constraint = None
-            if self.match(TokenType.AT):
-                self.advance()  # consume @
-                range_constraint = self.parse_range()
-            
-            if self.match(TokenType.LBRACKET):
-                self.advance()  # consume [
-                self.consume(TokenType.RBRACKET)  # consume ]
-                
-                # Check for size constraint
-                size_constraint = None
-                if self.match(TokenType.AT):
-                    self.advance()  # consume @
-                    size_constraint = self.parse_range()
-                
-                return ArrayType(PrimitiveType(base_type, range_constraint), size_constraint)
-            else:
-                return PrimitiveType(base_type, range_constraint)
-        
-        # Handle other primitive types
-        if self.match(TokenType.ANY, TokenType.BOOLEAN_KW, TokenType.STRING_KW,
-                     TokenType.SHORT, TokenType.FLOAT_KW, TokenType.DOUBLE):
-            type_name = self.advance().value
-            
-            # Check for range constraint
-            range_constraint = None
-            if self.match(TokenType.AT):
-                self.advance()  # consume @
-                range_constraint = self.parse_range()
-            
-            return PrimitiveType(type_name, range_constraint)
-        
-        # Handle literal types
-        if self.match(TokenType.TRUE, TokenType.FALSE):
-            return LiteralType(self.advance().value == "true")
-        
-        if self.match(TokenType.STRING):
-            return LiteralType(self.advance().value)
-        
-        if self.match(TokenType.INTEGER, TokenType.FLOAT, TokenType.TYPED_NUMBER):
-            value = self.advance().value
-            # Convert to appropriate Python type
-            try:
-                if '.' in value or 'e' in value.lower():
-                    return LiteralType(float(value.rstrip('fdFD')))
-                else:
-                    return LiteralType(int(value.rstrip('bslBSL')))
-            except ValueError:
-                return LiteralType(value)
-        
-        # Handle inline struct
-        if self.match(TokenType.STRUCT):
-            return self.parse_struct_type()
-        
-        # Handle inline enum
-        if self.match(TokenType.ENUM):
-            return self.parse_enum_type()
-        
-        # Handle reference type (identifier or path)
-        if self.match(TokenType.IDENTIFIER):
+            base_type = UnionType(types) if len(types) > 1 else types[0]
+        elif self.match(TokenType.IDENTIFIER):
             path = self.advance().value
-            
-            # Handle path separators
             while self.match(TokenType.PATH_SEP):
                 self.advance()  # consume ::
                 path += "::" + self.consume(TokenType.IDENTIFIER).value
-            
-            return ReferenceType(path)
-        
-        self.error(f"Unexpected token in type: {self.current_token().value}")
-    
+            base_type = ReferenceType(path)
+        else:
+            self.error(f"Unexpected token in type: {self.current_token().value}")
+
+        # Attach attributes to the type
+        if attributes:
+            if isinstance(base_type, ReferenceType):
+                base_type.attributes = attributes
+            elif isinstance(base_type, ArrayType):
+                base_type.element_type.attributes = attributes
+            elif isinstance(base_type, UnionType):
+                # For union types, attach attributes to each member type
+                for type_member in base_type.types:
+                    if isinstance(type_member, ReferenceType):
+                        type_member.attributes = attributes.copy()
+
+        return base_type
+
     def parse_range(self) -> str:
         """Parse a range constraint like 1..10 or ..5"""
         range_str = ""
@@ -773,25 +741,57 @@ class McdocParser:
         self.type_aliases[name] = TypeAlias(name, alias_type, type_params, doc_comment)
     
     def parse_use_statement(self):
-        """Parse use statement"""
+        """Parse use statement in the format:
+        use [::][super::]?path::to::item [as alias]?
+        """
         self.consume(TokenType.USE)
         
-        # Parse path
-        path = self.consume(TokenType.IDENTIFIER).value
+        segments = []
+        
+        # Handle optional leading ::
+        has_leading_path_sep = self.match(TokenType.PATH_SEP)
+        if has_leading_path_sep:
+            self.advance()
+        
+        # Parse first segment
+        if self.match(TokenType.SUPER):
+            segments.append(self.advance().value)
+            self.consume(TokenType.PATH_SEP)
+        elif not self.match(TokenType.IDENTIFIER):
+            self.error(f"Expected identifier or 'super' in use statement, got {self.current_token().type}")
+        
+        # Parse identifier segment
+        segments.append(self.consume(TokenType.IDENTIFIER).value)
+        
+        # Parse remaining path segments
         while self.match(TokenType.PATH_SEP):
             self.advance()  # consume ::
+            
+            # Handle super in middle of path
             if self.match(TokenType.SUPER):
-                path += "::" + self.advance().value
+                segments.append(self.advance().value)
+                self.consume(TokenType.PATH_SEP)
+                segments.append(self.consume(TokenType.IDENTIFIER).value)
             else:
-                path += "::" + self.consume(TokenType.IDENTIFIER).value
+                segments.append(self.consume(TokenType.IDENTIFIER).value)
         
-        # Optional alias
+        # Build full path
+        path = "::".join(segments)
+        if has_leading_path_sep:
+            path = "::" + path
+        
+        # Handle optional alias
+        alias = None
         if self.match(TokenType.AS):
-            self.advance()  # consume as
+            self.advance()  # consume 'as'
             alias = self.consume(TokenType.IDENTIFIER).value
-            # For now, just store the path
         
-        self.imports.append(path)
+        # Store use statement info
+        use_info = {
+            'path': path,
+            'alias': alias
+        }
+        self.imports.append(use_info)
     
     def parse(self) -> Dict[str, Any]:
         """Parse the entire file"""
@@ -855,28 +855,28 @@ class McdocProject:
         # Resolve type references
         self.resolve_types()
     
-    def load_file(self, path):
-        """Load a single mcdoc file"""
-        file_path = path
-        if file_path:
-            try:
-                # Create a temporary project with just this file
-                file_path_obj = Path(file_path)
-                self.project = McdocProject(str(file_path_obj.parent))
-                
-                # Load the single file
-                file_data = self.project.load_file(file_path_obj)
-                self.project.files[file_path_obj.name] = file_data
-                self.project.resolve_types()
-                
-                self.populate_structure_tree()
-                self.setWindowTitle(f"Mcdoc Form Generator - {file_path}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load file: {str(e)}")
+    def load_file(self, file_path: Path) -> Dict[str, Any]:
+        """Load a single mcdoc file and return its parsed data"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                source = f.read()
+            
+            # Tokenize
+            lexer = McdocLexer(source)
+            tokens = lexer.tokenize()
+            
+            # Parse
+            parser = McdocParser(tokens, str(file_path))
+            return parser.parse()
+            
+        except Exception as e:
+            raise Exception(f"Failed to load file {file_path}: {str(e)}")
     
     def resolve_types(self):
         """Resolve type references across files"""
         # Build a global type registry
+        self.resolved_types.clear()
+        
         for file_data in self.files.values():
             for name, struct in file_data['structs'].items():
                 self.resolved_types[name] = struct
@@ -1361,11 +1361,24 @@ class McdocFormGenerator(QMainWindow):
         layout.addWidget(splitter)
         
         # Left panel - project structure
+        left_panel = self._create_left_panel()
+        splitter.addWidget(left_panel)
+        
+        # Right panel - form area
+        right_panel = self._create_right_panel()
+        splitter.addWidget(right_panel)
+        
+        # Set splitter proportions
+        splitter.setSizes([300, 900])
+    
+    def _create_left_panel(self) -> QWidget:
+        """Create the left panel with project controls and structure tree"""
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         
         # Project controls
         project_controls = QHBoxLayout()
+        
         self.load_project_button = QPushButton("Load Project")
         self.load_project_button.clicked.connect(self.load_project)
         project_controls.addWidget(self.load_project_button)
@@ -1382,14 +1395,28 @@ class McdocFormGenerator(QMainWindow):
         self.structure_tree.itemClicked.connect(self.on_item_clicked)
         left_layout.addWidget(self.structure_tree)
         
-        splitter.addWidget(left_panel)
-        
-        # Right panel - form area
+        return left_panel
+    
+    def _create_right_panel(self) -> QWidget:
+        """Create the right panel with form controls and form area"""
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         
         # Form controls
+        form_controls = self._create_form_controls()
+        right_layout.addLayout(form_controls)
+        
+        # Form area
+        self.form_area = QScrollArea()
+        self.form_area.setWidgetResizable(True)
+        right_layout.addWidget(self.form_area)
+        
+        return right_panel
+    
+    def _create_form_controls(self) -> QHBoxLayout:
+        """Create form control buttons"""
         form_controls = QHBoxLayout()
+        
         self.export_json_button = QPushButton("Export JSON")
         self.export_json_button.clicked.connect(self.export_json)
         self.export_json_button.setEnabled(False)
@@ -1406,45 +1433,55 @@ class McdocFormGenerator(QMainWindow):
         form_controls.addWidget(self.validate_button)
         
         form_controls.addStretch()
-        right_layout.addLayout(form_controls)
-        
-        # Form area
-        self.form_area = QScrollArea()
-        self.form_area.setWidgetResizable(True)
-        right_layout.addWidget(self.form_area)
-        
-        splitter.addWidget(right_panel)
-        
-        # Set splitter proportions
-        splitter.setSizes([300, 900])
+        return form_controls
     
     def load_project(self):
         """Load a project directory"""
         directory = QFileDialog.getExistingDirectory(self, "Select Project Directory")
-        if directory:
-            try:
-                self.project = McdocProject(directory)
-                self.project.load_project()
-                self.populate_structure_tree()
-                self.setWindowTitle(f"Mcdoc Form Generator - {directory}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load project: {str(e)}")
+        if not directory:
+            return
+        
+        try:
+            self.project = McdocProject(directory)
+            self.project.load_project()
+            self._update_ui_after_load(f"Mcdoc Form Generator - {directory}")
+        except Exception as e:
+            self._show_error("Failed to load project", str(e))
     
     def load_file(self):
         """Load a single mcdoc file"""
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Mcdoc File", "", "Mcdoc Files (*.mcdoc)")
-        if file_path:
-            try:
-                # Create a temporary project with just this file
-                file_path_obj = Path(file_path)
-                self.project = McdocProject(str(file_path_obj.parent))
-                file_data = self.project.load_file(file_path_obj)
-                self.project.files[file_path_obj.name] = file_data
-                self.project.resolve_types()
-                self.populate_structure_tree()
-                self.setWindowTitle(f"Mcdoc Form Generator - {file_path}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load file: {str(e)}")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Mcdoc File", "", "Mcdoc Files (*.mcdoc)"
+        )
+        if not file_path:
+            return
+        
+        try:
+            # Create a project with just this file
+            file_path_obj = Path(file_path)
+            self.project = McdocProject(str(file_path_obj.parent))
+            
+            # Load the single file
+            file_data = self.project.load_file(file_path_obj)
+            self.project.files[file_path_obj.name] = file_data
+            self.project.resolve_types()
+            
+            self._update_ui_after_load(f"Mcdoc Form Generator - {file_path}")
+        except Exception as e:
+            self._show_error("Failed to load file", str(e))
+    
+    def _update_ui_after_load(self, window_title: str):
+        """Update UI after successfully loading project or file"""
+        self.populate_structure_tree()
+        self.setWindowTitle(window_title)
+    
+    def _show_error(self, title: str, message: str):
+        """Show error message dialog"""
+        QMessageBox.critical(self, "Error", f"{title}: {message}")
+    
+    def _show_success(self, message: str):
+        """Show success message dialog"""
+        QMessageBox.information(self, "Success", message)
     
     def populate_structure_tree(self):
         """Populate the structure tree with project data"""
@@ -1454,22 +1491,22 @@ class McdocFormGenerator(QMainWindow):
             return
         
         # Add struct types
-        structs = self.project.get_struct_types()
-        if structs:
-            struct_root = QTreeWidgetItem(self.structure_tree, ["Structs"])
-            for name, struct_type in structs.items():
-                item = QTreeWidgetItem(struct_root, [name])
-                item.setData(0, Qt.UserRole, ("struct", name, struct_type))
+        self._add_tree_section("Structs", self.project.get_struct_types(), "struct")
         
         # Add enum types
-        enums = self.project.get_enum_types()
-        if enums:
-            enum_root = QTreeWidgetItem(self.structure_tree, ["Enums"])
-            for name, enum_type in enums.items():
-                item = QTreeWidgetItem(enum_root, [name])
-                item.setData(0, Qt.UserRole, ("enum", name, enum_type))
+        self._add_tree_section("Enums", self.project.get_enum_types(), "enum")
         
         self.structure_tree.expandAll()
+    
+    def _add_tree_section(self, section_name: str, items: Dict[str, Any], item_type: str):
+        """Add a section to the structure tree"""
+        if not items:
+            return
+        
+        section_root = QTreeWidgetItem(self.structure_tree, [section_name])
+        for name, item_data in items.items():
+            item = QTreeWidgetItem(section_root, [name])
+            item.setData(0, Qt.UserRole, (item_type, name, item_data))
     
     def on_item_clicked(self, item: QTreeWidgetItem, column: int):
         """Handle item click in structure tree"""
@@ -1484,39 +1521,51 @@ class McdocFormGenerator(QMainWindow):
         self.form_area.setWidget(self.current_form)
         
         # Enable form controls
-        self.export_json_button.setEnabled(True)
-        self.import_json_button.setEnabled(True)
-        self.validate_button.setEnabled(True)
+        self._set_form_controls_enabled(True)
+    
+    def _set_form_controls_enabled(self, enabled: bool):
+        """Enable or disable form control buttons"""
+        self.export_json_button.setEnabled(enabled)
+        self.import_json_button.setEnabled(enabled)
+        self.validate_button.setEnabled(enabled)
     
     def export_json(self):
         """Export current form data as JSON"""
         if not self.current_form:
             return
         
-        file_path, _ = QFileDialog.getSaveFileName(self, "Export JSON", "", "JSON Files (*.json)")
-        if file_path:
-            try:
-                data = self.current_form.get_data()
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                QMessageBox.information(self, "Success", "Data exported successfully!")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to export JSON: {str(e)}")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export JSON", "", "JSON Files (*.json)"
+        )
+        if not file_path:
+            return
+        
+        try:
+            data = self.current_form.get_data()
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            self._show_success("Data exported successfully!")
+        except Exception as e:
+            self._show_error("Failed to export JSON", str(e))
     
     def import_json(self):
         """Import JSON data into current form"""
         if not self.current_form:
             return
         
-        file_path, _ = QFileDialog.getOpenFileName(self, "Import JSON", "", "JSON Files (*.json)")
-        if file_path:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                self.current_form.set_data(data)
-                QMessageBox.information(self, "Success", "Data imported successfully!")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to import JSON: {str(e)}")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Import JSON", "", "JSON Files (*.json)"
+        )
+        if not file_path:
+            return
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            self.current_form.set_data(data)
+            self._show_success("Data imported successfully!")
+        except Exception as e:
+            self._show_error("Failed to import JSON", str(e))
     
     def validate_form(self):
         """Validate current form"""
@@ -1525,11 +1574,10 @@ class McdocFormGenerator(QMainWindow):
         
         is_valid, errors = self.current_form.validate()
         if is_valid:
-            QMessageBox.information(self, "Validation", "Form is valid!")
+            self._show_success("Form is valid!")
         else:
             error_message = "Validation errors:\n\n" + "\n".join(errors)
             QMessageBox.warning(self, "Validation Errors", error_message)
-
 
 def main():
     """Main application entry point"""
