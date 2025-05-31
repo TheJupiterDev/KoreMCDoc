@@ -855,6 +855,25 @@ class McdocProject:
         # Resolve type references
         self.resolve_types()
     
+    def load_file(self, path):
+        """Load a single mcdoc file"""
+        file_path = path
+        if file_path:
+            try:
+                # Create a temporary project with just this file
+                file_path_obj = Path(file_path)
+                self.project = McdocProject(str(file_path_obj.parent))
+                
+                # Load the single file
+                file_data = self.project.load_file(file_path_obj)
+                self.project.files[file_path_obj.name] = file_data
+                self.project.resolve_types()
+                
+                self.populate_structure_tree()
+                self.setWindowTitle(f"Mcdoc Form Generator - {file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load file: {str(e)}")
+    
     def resolve_types(self):
         """Resolve type references across files"""
         # Build a global type registry
