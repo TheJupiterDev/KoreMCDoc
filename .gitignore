@@ -1,2 +1,3 @@
 mcdoc/
 __pycache__/
+*.html

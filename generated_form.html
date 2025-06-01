@@ -28,17 +28,18 @@
             <div class="struct-container">
             <h3>Player</h3>
             <div class="field-group"><div class="field-group">
-            <label class="field-label" title="The player&#x27;s name">Player.name (reference to string)</label>
-            <input type="text" id="field_1_name" name="Player.name" class="field-input" placeholder="Reference: string">
+            <label class="field-label" title="The player&#x27;s name" for="field_1_name">name</label>
+            <input type="text" id="field_1_name" name="name" class="field-input">
         </div><small class="help-text">The player&#x27;s name</small></div><div class="field-group"><div class="field-group">
-            <label class="field-label" title="Player&#x27;s health (0-20)">Player.health (reference to float)</label>
-            <input type="text" id="field_1_health" name="Player.health" class="field-input" placeholder="Reference: float">
+            <label class="field-label" title="Player&#x27;s health (0-20)" for="field_1_health">health (float)</label>
+            <input type="number" id="field_1_health" name="health" class="field-input" step="any">
         </div><small class="help-text">Player&#x27;s health (0-20)</small></div><div class="field-group"><div class="field-group">
-            <label class="field-label" title="Player&#x27;s level">Player.level (reference to int)</label>
-            <input type="text" id="field_1_level" name="Player.level" class="field-input" placeholder="Reference: int">
+            <label class="field-label" title="Player&#x27;s level" for="field_1_level">level (int)</label>
+            <input type="number" id="field_1_level" name="level" class="field-input" step="1">
         </div><small class="help-text">Player&#x27;s level</small></div><div class="field-group"><div class="field-group">
-            <label class="field-label" title="Whether the player is online <span class='optional'>(optional)</span>">Player.online <span class='optional'>(optional)</span> (reference to boolean)</label>
-            <input type="text" id="field_1_online <span class='optional'>(optional)</span>" name="Player.online <span class='optional'>(optional)</span>" class="field-input" placeholder="Reference: boolean">
+            <label class="field-label" title="Whether the player is online <span class='optional'>(optional)</span>">online <span class='optional'>(optional)</span></label>
+            <label><input type="radio" name="online <span class='optional'>(optional)</span>" value="true"> True</label>
+            <label><input type="radio" name="online <span class='optional'>(optional)</span>" value="false"> False</label>
         </div><small class="help-text">Whether the player is online</small></div>
         </div>
             <div style="margin-top: 20px;">

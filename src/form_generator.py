@@ -208,7 +208,7 @@ class HTMLFormGenerator(FormGenerator):
     def _generate_struct_field(self, name: str, field_id: str, struct_type: StructType) -> str:
         fields_html = ""
         for field in struct_type.fields:
-            field_html = self._generate_field(field.type, f"{name}.{field.name}", f"{field_id}_{field.name}")
+            field_html = self._generate_field(field.type, field.name, f"{field_id}_{field.name}")
             optional_text = " <span class='optional'>(optional)</span>" if field.optional else ""
             doc_text = f' title="{html.escape(field.doc_comment)}"' if field.doc_comment else ""
             
