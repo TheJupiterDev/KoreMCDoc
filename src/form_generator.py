@@ -48,6 +48,7 @@ class HTMLFormGenerator(FormGenerator):
         .add-button {{ background: #4CAF50; color: white; }}
         .remove-button {{ background: #f44336; color: white; }}
         .struct-container {{ background: #fafafa; padding: 15px; margin: 10px 0; border-radius: 5px; }}
+        .help-text {{ color: #666; font-style: italic; display: block; margin-top: 3px; }}
     </style>
 </head>
 <body>
@@ -121,6 +122,8 @@ class HTMLFormGenerator(FormGenerator):
             return self._generate_union_field(name, field_id, mcdoc_type)
         elif isinstance(mcdoc_type, ReferenceType):
             return self._generate_reference_field(name, field_id, mcdoc_type)
+        elif isinstance(mcdoc_type, AttributeType):
+            return self._generate_attribute_field(name, field_id, mcdoc_type)
         else:
             return f'<div class="field-group">Unsupported type: {type(mcdoc_type).__name__}</div>'
     
@@ -207,7 +210,19 @@ class HTMLFormGenerator(FormGenerator):
         for field in struct_type.fields:
             field_html = self._generate_field(field.type, f"{name}.{field.name}", f"{field_id}_{field.name}")
             optional_text = " <span class='optional'>(optional)</span>" if field.optional else ""
-            fields_html += f'<div class="field-group">{field_html.replace(field.name, field.name + optional_text)}</div>'
+            doc_text = f' title="{html.escape(field.doc_comment)}"' if field.doc_comment else ""
+            
+            # Add doc comment as a tooltip and help text
+            help_text = ""
+            if field.doc_comment:
+                help_text = f'<small class="help-text">{html.escape(field.doc_comment)}</small>'
+            
+            field_with_label = field_html.replace(
+                f'<label class="field-label"',
+                f'<label class="field-label"{doc_text}'
+            ).replace(field.name, field.name + optional_text)
+            
+            fields_html += f'<div class="field-group">{field_with_label}{help_text}</div>'
         
         return f'''<div class="struct-container">
             <h3>{html.escape(name)}</h3>
@@ -234,11 +249,11 @@ class HTMLFormGenerator(FormGenerator):
         </div>
         <script>
             function showUnionOption(select, fieldId) {{
-                const containers = document.querySelectorAll(`[id^="${field_id}_option_"][id$="_container"]`);
+                const containers = document.querySelectorAll(`[id^="${fieldId}_option_"][id$="_container"]`);
                 containers.forEach(c => c.style.display = 'none');
                 
                 if (select.value !== '') {{
-                    document.getElementById(`${field_id}_option_${select.value}_container`).style.display = 'block';
+                    document.getElementById(`${fieldId}_option_${select.value}_container`).style.display = 'block';
                 }}
             }}
         </script>'''
@@ -248,3 +263,19 @@ class HTMLFormGenerator(FormGenerator):
             <label class="field-label">{html.escape(name)} (reference to {ref_type.path})</label>
             <input type="text" id="{field_id}" name="{name}" class="field-input" placeholder="Reference: {ref_type.path}">
         </div>'''
+    
+    def _generate_attribute_field(self, name: str, field_id: str, attr_type: AttributeType) -> str:
+        # Generate the base field with attribute info
+        base_field = self._generate_field(attr_type.base_type, name, field_id)
+        
+        # Add attribute information as a data attribute and placeholder
+        attr_info = ", ".join(attr_type.attributes)
+        placeholder_addition = f" (with attributes: {attr_info})"
+        
+        # Modify the base field to include attribute info
+        if 'placeholder="' in base_field:
+            base_field = base_field.replace('placeholder="', f'placeholder="{placeholder_addition} ')
+        else:
+            base_field = base_field.replace('class="field-input"', f'class="field-input" placeholder="{placeholder_addition}"')
+        
+        return base_field

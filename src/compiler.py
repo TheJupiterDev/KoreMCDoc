@@ -34,14 +34,21 @@ class McdocCompiler:
         struct_types = []
         
         while parser.current_token:
+            # Skip doc comments at top level
+            while parser.match('DOC_COMMENT'):
+                parser.advance()
+            
             if parser.match('IDENTIFIER') and parser.current_token[1] == 'struct':
                 parser.advance()  # consume 'struct'
+                if not parser.current_token:
+                    break
                 struct_name = parser.expect('IDENTIFIER')
                 struct_type = parser.parse_struct()
                 struct_types.append((struct_name, struct_type))
                 self.type_registry[struct_name] = struct_type
             else:
-                parser.advance()
+                if parser.current_token:
+                    parser.advance()
         
         # Generate form for the first struct found
         if struct_types:

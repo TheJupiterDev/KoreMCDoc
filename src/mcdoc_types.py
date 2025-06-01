@@ -91,3 +91,10 @@ class EnumType(McdocType):
     name: str
     values: List[str]
     doc_comments: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class AttributeType(McdocType):
+    """Attribute-decorated type"""
+    base_type: McdocType
+    attributes: List[str] = field(default_factory=list)

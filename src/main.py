@@ -12,30 +12,16 @@ def main():
     
     # Example Mcdoc content
     example_mcdoc = '''
-    /// A player entity structure
+    /// A simple player entity structure
     struct Player {
         /// The player's name
         name: string,
         /// Player's health (0-20)
-        health: float @ 0..20,
+        health: float,
         /// Player's level
-        level: int @ 0..,
+        level: int,
         /// Whether the player is online
         online?: boolean,
-        /// Player's inventory
-        inventory: [ItemStack] @ 0..36,
-        /// Player's position
-        position: [float, float, float],
-    }
-    
-    /// An item stack
-    struct ItemStack {
-        /// Item ID
-        id: #[id=item] string,
-        /// Stack count
-        count: byte @ 1..64,
-        /// Item damage/durability
-        damage?: int @ 0..,
     }
     '''
     

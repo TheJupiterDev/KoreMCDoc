@@ -108,16 +108,31 @@ class McdocParser:
     
     def _parse_primary_type(self) -> McdocType:
         """Parse primary type expressions"""
+        # Handle attributes first
+        attributes = []
+        while self.match('HASH'):
+            self.advance()  # consume #
+            if self.match('LBRACKET'):
+                self.advance()  # consume [
+                # Parse attribute content - for now just consume until ]
+                attr_content = ""
+                while self.current_token and not self.match('RBRACKET'):
+                    attr_content += self.current_token[1]
+                    self.advance()
+                self.expect('RBRACKET')
+                attributes.append(attr_content)
+        
+        base_type = None
         if self.match('IDENTIFIER'):
-            return self._parse_identifier_type()
+            base_type = self._parse_identifier_type()
         elif self.match('STRING'):
-            return self._parse_literal_string()
+            base_type = self._parse_literal_string()
         elif self.match('NUMBER'):
-            return self._parse_number_type()
+            base_type = self._parse_number_type()
         elif self.match('LBRACKET'):
-            return self._parse_list_or_tuple()
+            base_type = self._parse_list_or_tuple()
         elif self.match('LPAREN'):
-            return self._parse_grouped_type()
+            base_type = self._parse_grouped_type()
         else:
             # Handle built-in types
             if self.current_token and self.current_token[1] in ['any', 'boolean', 'string', 'byte', 'short', 'int', 'long', 'float', 'double']:
@@ -125,15 +140,29 @@ class McdocParser:
                 self.advance()
                 
                 if type_name == 'any':
-                    return AnyType()
+                    base_type = AnyType()
                 elif type_name == 'boolean':
-                    return BooleanType()
+                    base_type = BooleanType()
                 elif type_name == 'string':
-                    return StringType()
+                    base_type = StringType()
                 else:
-                    return NumericType(type_name)
-            
-            raise SyntaxError(f"Unexpected token: {self.current_token}")
+                    base_type = NumericType(type_name)
+            else:
+                raise SyntaxError(f"Unexpected token: {self.current_token}")
+        
+        # Handle range constraints (@1..10)
+        if self.match('AT'):
+            self.advance()  # consume @
+            # For now, just consume the range - proper parsing would be more complex
+            while self.current_token and self.current_token[0] not in ['COMMA', 'RBRACE', 'RBRACKET', 'RPAREN']:
+                self.advance()
+        
+        if attributes and base_type:
+            return AttributeType(base_type, attributes)
+        elif base_type:
+            return base_type
+        else:
+            raise SyntaxError(f"Failed to parse type at: {self.current_token}")
     
     def _parse_identifier_type(self) -> McdocType:
         """Parse identifier-based types (references, etc.)"""
@@ -224,6 +253,15 @@ class McdocParser:
         fields = []
         
         while not self.match('RBRACE') and self.current_token:
+            # Skip doc comments and collect them
+            doc_comment = None
+            while self.match('DOC_COMMENT'):
+                if doc_comment is None:
+                    doc_comment = self.current_token[1][3:].strip()  # Remove /// and whitespace
+                else:
+                    doc_comment += "\n" + self.current_token[1][3:].strip()
+                self.advance()
+            
             # Handle spread operator
             if self.match('SPREAD'):
                 self.advance()
@@ -234,6 +272,9 @@ class McdocParser:
                 continue
             
             # Parse field
+            if not self.match('IDENTIFIER'):
+                break  # No more fields
+                
             field_name = self.expect('IDENTIFIER')
             
             optional = False
@@ -244,7 +285,7 @@ class McdocParser:
             self.expect('COLON')
             field_type = self.parse_type()
             
-            fields.append(StructField(field_name, field_type, optional))
+            fields.append(StructField(field_name, field_type, optional, doc_comment))
             
             if self.match('COMMA'):
                 self.advance()

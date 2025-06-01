@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mcdoc Form</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-container { max-width: 800px; margin: 0 auto; }
+        .field-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .field-label { font-weight: bold; margin-bottom: 5px; display: block; }
+        .field-input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
+        .optional { color: #666; font-style: italic; }
+        .union-selector { margin-bottom: 10px; }
+        .list-container { border: 1px solid #eee; padding: 10px; margin: 5px 0; }
+        .list-item { background: #f9f9f9; padding: 5px; margin: 5px 0; border-radius: 3px; }
+        .add-button, .remove-button { padding: 5px 10px; margin: 2px; border: none; border-radius: 3px; cursor: pointer; }
+        .add-button { background: #4CAF50; color: white; }
+        .remove-button { background: #f44336; color: white; }
+        .struct-container { background: #fafafa; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .help-text { color: #666; font-style: italic; display: block; margin-top: 3px; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Generated Form</h1>
+        <form id="mcdoc-form">
+            <div class="struct-container">
+            <h3>Player</h3>
+            <div class="field-group"><div class="field-group">
+            <label class="field-label" title="The player&#x27;s name">Player.name (reference to string)</label>
+            <input type="text" id="field_1_name" name="Player.name" class="field-input" placeholder="Reference: string">
+        </div><small class="help-text">The player&#x27;s name</small></div><div class="field-group"><div class="field-group">
+            <label class="field-label" title="Player&#x27;s health (0-20)">Player.health (reference to float)</label>
+            <input type="text" id="field_1_health" name="Player.health" class="field-input" placeholder="Reference: float">
+        </div><small class="help-text">Player&#x27;s health (0-20)</small></div><div class="field-group"><div class="field-group">
+            <label class="field-label" title="Player&#x27;s level">Player.level (reference to int)</label>
+            <input type="text" id="field_1_level" name="Player.level" class="field-input" placeholder="Reference: int">
+        </div><small class="help-text">Player&#x27;s level</small></div><div class="field-group"><div class="field-group">
+            <label class="field-label" title="Whether the player is online <span class='optional'>(optional)</span>">Player.online <span class='optional'>(optional)</span> (reference to boolean)</label>
+            <input type="text" id="field_1_online <span class='optional'>(optional)</span>" name="Player.online <span class='optional'>(optional)</span>" class="field-input" placeholder="Reference: boolean">
+        </div><small class="help-text">Whether the player is online</small></div>
+        </div>
+            <div style="margin-top: 20px;">
+                <button type="button" onclick="generateJSON()">Generate JSON</button>
+                <button type="button" onclick="validateForm()">Validate</button>
+            </div>
+        </form>
+        <div id="output" style="margin-top: 20px; padding: 10px; background: #f0f0f0; display: none;">
+            <h3>Generated JSON:</h3>
+            <pre id="json-output"></pre>
+        </div>
+    </div>
+    
+    <script>
+        function generateJSON() {
+            const form = document.getElementById('mcdoc-form');
+            const formData = new FormData(form);
+            const result = {};
+            
+            for (let [key, value] of formData.entries()) {
+                result[key] = value;
+            }
+            
+            document.getElementById('json-output').textContent = JSON.stringify(result, null, 2);
+            document.getElementById('output').style.display = 'block';
+        }
+        
+        function validateForm() {
+            // TODO: Implement validation logic
+            alert('Validation functionality not yet implemented');
+        }
+        
+        function addListItem(containerId, template) {
+            const container = document.getElementById(containerId);
+            const newItem = document.createElement('div');
+            newItem.innerHTML = template;
+            container.appendChild(newItem);
+        }
+        
+        function removeListItem(button) {
+            button.parentElement.remove();
+        }
+    </script>
+</body>
+</html>
