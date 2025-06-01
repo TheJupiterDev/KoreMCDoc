@@ -10,20 +10,22 @@ from compiler import McdocCompiler
 def main():
     """Example usage of the Mcdoc compiler"""
     
+    with open('mcdoc/data/enchantment.mcdoc', 'r') as f:
+        example_mcdoc = f.read()
     # Example Mcdoc content
-    example_mcdoc = '''
-    /// A simple player entity structure
-    struct Player {
-        /// The player's name
-        name: string,
-        /// Player's health (0-20)
-        health: float,
-        /// Player's level
-        level: int,
-        /// Whether the player is online
-        online?: boolean,
-    }
-    '''
+    # example_mcdoc = '''
+    # /// A simple player entity structure
+    # struct Player {
+    #     /// The player's name
+    #     name: string,
+    #     /// Player's health (0-20)
+    #     health: float,
+    #     /// Player's level
+    #     level: int,
+    #     /// Whether the player is online
+    #     online?: boolean,
+    # }
+    # '''
     
     # Compile to HTML form
     compiler = McdocCompiler()

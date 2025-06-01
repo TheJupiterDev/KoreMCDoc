@@ -19,6 +19,23 @@
         .remove-button { background: #f44336; color: white; }
         .struct-container { background: #fafafa; padding: 15px; margin: 10px 0; border-radius: 5px; }
         .help-text { color: #666; font-style: italic; display: block; margin-top: 3px; }
+        
+        .map-container { border: 1px solid #eee; padding: 10px; margin: 5px 0; }
+        .map-entry { background: #f9f9f9; padding: 10px; margin: 5px 0; border-radius: 3px; }
+        .map-key-value { display: flex; gap: 10px; margin-bottom: 10px; }
+        .conditional-field { border-left: 3px solid #007bff; padding-left: 10px; }
+        .switch-selector { width: 100%; padding: 8px; margin-bottom: 10px; }
+        .index-container { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+        .versioned-field { position: relative; }
+        .version-info { color: #6c757d; font-weight: normal; }
+        .nested-struct-container { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #28a745; }
+        .inheritance-info { color: #6c757d; font-style: italic; display: block; margin-bottom: 10px; }
+        .constraint-field { border-left: 3px solid #ffc107; padding-left: 10px; }
+        .constraints-info { color: #856404; font-weight: bold; }
+        .module-container { background: #e9ecef; padding: 15px; margin: 10px 0; border-radius: 5px; border: 2px solid #6c757d; }
+        .module-exports { margin-bottom: 15px; padding: 5px; background: #fff; border-radius: 3px; }
+        .module-type-field { margin: 10px 0; padding: 10px; background: #fff; border-radius: 5px; }
+
     </style>
 </head>
 <body>
@@ -26,21 +43,14 @@
         <h1>Generated Form</h1>
         <form id="mcdoc-form">
             <div class="struct-container">
-            <h3>Player</h3>
+            <h3>EnchantmentCost</h3>
             <div class="field-group"><div class="field-group">
-            <label class="field-label" title="The player&#x27;s name" for="field_1_name">name</label>
-            <input type="text" id="field_1_name" name="name" class="field-input">
-        </div><small class="help-text">The player&#x27;s name</small></div><div class="field-group"><div class="field-group">
-            <label class="field-label" title="Player&#x27;s health (0-20)" for="field_1_health">health (float)</label>
-            <input type="number" id="field_1_health" name="health" class="field-input" step="any">
-        </div><small class="help-text">Player&#x27;s health (0-20)</small></div><div class="field-group"><div class="field-group">
-            <label class="field-label" title="Player&#x27;s level" for="field_1_level">level (int)</label>
-            <input type="number" id="field_1_level" name="level" class="field-input" step="1">
-        </div><small class="help-text">Player&#x27;s level</small></div><div class="field-group"><div class="field-group">
-            <label class="field-label" title="Whether the player is online <span class='optional'>(optional)</span>">online <span class='optional'>(optional)</span></label>
-            <label><input type="radio" name="online <span class='optional'>(optional)</span>" value="true"> True</label>
-            <label><input type="radio" name="online <span class='optional'>(optional)</span>" value="false"> False</label>
-        </div><small class="help-text">Whether the player is online</small></div>
+            <label class="field-label" title="Base cost at level 1." for="field_1_base">base (int)</label>
+            <input type="number" id="field_1_base" name="base" class="field-input" step="1">
+        </div><small class="help-text">Base cost at level 1.</small></div><div class="field-group"><div class="field-group">
+            <label class="field-label" title="Cost increase per level above 1." for="field_1_per_level_above_first">per_level_above_first (int)</label>
+            <input type="number" id="field_1_per_level_above_first" name="per_level_above_first" class="field-input" step="1">
+        </div><small class="help-text">Cost increase per level above 1.</small></div>
         </div>
             <div style="margin-top: 20px;">
                 <button type="button" onclick="generateJSON()">Generate JSON</button>
