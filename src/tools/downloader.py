@@ -1,3 +1,5 @@
+# Downloads the vanilla-mcdocs
+
 import os
 import requests
 
@@ -38,4 +40,4 @@ def fetch_and_download(api_url, rel_path=""):
             fetch_and_download(item["url"], item_path)
 
 # Start
-fetch_and_download(API_URL)
+fetch_and_download(API_URL) # Downloads the vanilla-mcdoc

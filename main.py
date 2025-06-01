@@ -1,3 +1,0 @@
-"""
-Mcdoc to HTML renderer
-"""
